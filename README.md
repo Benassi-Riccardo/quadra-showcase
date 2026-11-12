@@ -1,7 +1,7 @@
 # Quadra
 
-**A personal finance web app for people living in Italy: monthly budget, sinking funds, accounts, net worth and
-bank-statement import in one place, fully in Italian.**
+**A personal finance analytics app for people living in Italy: it turns bank movements into a monthly budget, savings
+KPIs, goal tracking, net worth history and a cash-flow forecast, fully in Italian.**
 
 **Live app: [quadra-conti.vercel.app](https://quadra-conti.vercel.app)** · Designed and built by **Riccardo Benassi**, October-November 2026
 
@@ -58,6 +58,34 @@ Copilot, Finary, Wallet) that became the product roadmap. The niche it targets:
 | **Your data**               | JSON backup and Italian CSV export, account deletion that removes everything, email/password or Google sign-in, password reset by email.                                                                |
 | **Everywhere**              | Dark mode, phone layout (drawer navigation, bottom-sheet dialogs, compact lists), in-app guides, motion that respects `prefers-reduced-motion`.                                                         |
 
+## Data and analytics
+
+The part of the project closest to my data work: getting messy financial data in, defining the metrics, and making
+every figure in the app agree with every other.
+
+- **Data ingestion from bank statements.** PDF, CSV and Excel exports are turned into one clean movement table:
+  automatic detection of delimiters, header rows and Italian vs English number and date formats, a column mapping
+  remembered per account, and dedicated parsers for Allianz Bank PDFs that rebuild rows from positioned text. When a
+  statement prints its opening and closing balances, the parsed rows are checked against them, so a missed line shows.
+- **Data quality before anything is counted.** Duplicate movements are caught with per-movement fingerprints (date,
+  amount, type and a hash of the normalized description), so importing the same file twice adds nothing. Transfers
+  between your own accounts are paired (opposite sign, same amount, within 3 days) so money is never counted twice.
+  Every imported row waits in a review list before it becomes a transaction.
+- **Categorisation.** User-defined rules (contains / starts with / equals, optional account and amount range, ordered by
+  priority) run first; when none matches, the category is suggested from the history of similar past descriptions.
+- **One definition per metric.** Income, expenses and savings rate exclude internal moves (transfers, money set aside
+  in funds) everywhere; net worth has a single formula (account liquidity + assets + fund balances - debts); split
+  transactions count once, through their parts.
+- **Honest comparisons.** The year in progress is compared with the same stretch of the previous year, up to today's
+  date, never with a full year. Averages and the year-end estimate use closed months only (the estimate needs at least
+  two).
+- **Net worth over time.** One point per month: liquidity and fund balances recomputed from the movements at each month
+  end, assets and debts from monthly snapshots, and the current month from live data so the chart's last point equals
+  the headline figure.
+- **Cash-flow forecast.** Month-by-month liquidity built from the open recurring items, the contributions goals still
+  need, debt payments and the average of non-recurring flows over the last closed months, with switches for each
+  component and what-if scenarios (a one-off expense, an income change).
+
 ## Tech stack
 
 | Layer    | Technology                                                                                                                    | Hosting  |
@@ -78,10 +106,8 @@ flowchart LR
 ## Engineering highlights
 
 - **Privacy-by-design statement import.** PDF, CSV and XLSX files are parsed in the browser and never uploaded. Only
-  normalized fields reach the server, after IBANs, card numbers, codici fiscali and long reference numbers are scrubbed.
-  It includes a parser for Allianz Bank PDF statements that works on positioned text, automatic detection of
-  delimiters, header rows and Italian vs English number formats, duplicate detection through per-movement fingerprints,
-  and pairing of transfers between your own accounts so money is never counted twice.
+  normalized fields reach the server, after IBANs, card numbers, codici fiscali and long reference numbers are scrubbed,
+  and the database runs in the EU.
 - **One SQL code path, two engines.** The same plain-Postgres SQL runs on Supabase in production and on embedded
   PGlite locally, so the 600+ automated tests (unit tests for the pure logic, API tests with supertest) hit real
   Postgres behaviour without Docker or a shared database.
@@ -103,7 +129,7 @@ flowchart LR
 - **Product first:** competitor research turned into a phased roadmap (21 items, 16 shipped), and each item shipped on
   its own branch and pull request, with a dated changelog of what reached production.
 - **AI-assisted development:** built with AI coding agents (Claude Code, Antigravity) under my direction. I owned the
-  product decisions, the architecture and data model, reviewed every change, and kept the codebase conventions in a
+  product decisions, the architecture, the data model and the metric definitions, reviewed every change, and kept the codebase conventions in a
   project guide the agents follow.
 - **In numbers** (as of November 2026): about 32,000 lines of TypeScript and JavaScript, 89 React components, 36 pure
   logic modules, 626 automated tests in 43 files, 244 commits and 69 merged pull requests in about five weeks.
